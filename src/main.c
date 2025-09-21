@@ -54,7 +54,7 @@ void trierTableau(float *tab, int taille);
 float filtreMedianeMoy(float* tab, float tolDistance);
 float conversion(int valeur);
 
-
+// TODO : supprimer les boucle while(1) et remplacer par des timers et callbacks
 //      Programme main
 void app_main(){
     setup();
