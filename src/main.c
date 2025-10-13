@@ -11,29 +11,10 @@
 #include "esp_intr_alloc.h"
 #include "esp_adc/adc_oneshot.h"
 #include "hal/adc_types.h"
-//      Leds classiques
-#define LED_RED                 41
-#define LED_GREEN               17
-//      signal PWM
-#define LEDC_OUTPUT_IO          5
-#define LEDC_CHANNEL            LEDC_CHANNEL_0
-#define LEDC_DUTY_RES           LEDC_TIMER_13_BIT // résolution sur 13 bits
-#define LEDC_DUTY               (4096) // Cycle à 50% de sa valeur max (2 ** 13) * 50% = 4096, évite le dépassement d'index du registre
-#define LEDC_FREQUENCY          (4000) // Fréquence à 4kHz
-#define LEDC_TIMER              LEDC_TIMER_0
-#define LEDC_MODE               LEDC_LOW_SPEED_MODE
-//      Capteur ultrasons
-#define TRIG                    45
-#define ECHO                    47
-#define DISTANCE_MAX            50 // en centimètres
-#define VITESSE_SON             340 // en m.s⁻1
-//      Capteur d'humidité
-#define SENSOR_ANALOG_PIN       5  // Capteur relié à la PIN 5
-#define SENSOR_ANALOG_CHANNEL  ADC_CHANNEL_4 // Voix ADC pour la PIN 5
-#define MAX_RESOLUTION          4095 // résolution capteur en bits (12, selon datasheet esp32)
-#define VOLTAGE                 3.3 // alimentation du capteur d'humidite
-//      fonction trierTableau
-#define TAILLE_TAB              20
+
+// Personnal libs
+#include "utils.h"
+#include "config.h"
 
 //      Manageurs de tâches
 TaskHandle_t ledTaskHandleRed = NULL;
@@ -47,12 +28,8 @@ void setup();
 void ledTaskRed(void *arg);
 void ledTaskGreen(void *arg);
 // void ledTaskBlue(void *arg);                vTaskDelay(pdMS_TO_TICKS(1000));
-
 void capteurHumidite(void *arg);
 void capteurDistance(void *arg);
-void trierTableau(float *tab, int taille);
-float filtreMedianeMoy(float* tab, float tolDistance);
-float conversion(int valeur);
 
 // TODO : supprimer les boucle while(1) et remplacer par des timers et callbacks
 //      Programme main
@@ -201,42 +178,6 @@ void setup(){
     gpio_set_direction(SENSOR_ANALOG_PIN, GPIO_MODE_INPUT);       
 }
 
-// tri d'un tableau de float par ordre croissant de taile donnée
-void trierTableau(float *tab, int taille) {
-    int i, j, temp;
-    for (i = 0; i < taille - 1; i++) {
-        for (j = 0; j < taille - i - 1; j++) {
-            if (tab[j] > tab[j + 1]) {
-                // Échange
-                temp = tab[j];
-                tab[j] = tab[j + 1];
-                tab[j + 1] = temp;
-            }
-        }
-    }
-}
-
-float filtreMedianeMoy(float* tab, float tolDistance) {
-    /* tolerance à donnée en cm */
-    float mediane = tab[TAILLE_TAB/2];
-    float borneMin = mediane - tolDistance;
-    float borneMax = mediane + tolDistance;
-    float mesuresAddi = 0.0;
-    int nbMesureAcceptee = 0;
-    for (int i = 0; i < (TAILLE_TAB - 1); i++){
-        if (tab[i] >= borneMin && tab[i] <= borneMax) {
-            mesuresAddi += tab[i];
-            nbMesureAcceptee ++;
-        }    
-    }
-    if (nbMesureAcceptee == 0) {
-        return 0;
-    }
-    else {
-        return (mesuresAddi / nbMesureAcceptee);
-    }  
-}
-
 void capteurHumidite(void *arg){
     int humidite = 0;
     static const char *TAG = "HUMIDITE";
@@ -271,11 +212,4 @@ void capteurHumidite(void *arg){
     }
     adc_oneshot_del_unit(adc1_handle);      // supprime le handler pour l'ADC, libère la ressource
     vTaskDelete(NULL);                      // supprime la tâche
-}
-
-float conversion(int valeur) {
-    // conversion de la valeur brute entière vers voltage lu puis vers % d'humidite
-    float volts = valeur * (VOLTAGE / MAX_RESOLUTION);  // valeur en volts
-    float pourcentHumidite = volts * 100 / 3.3;
-    return pourcentHumidite;
 }
