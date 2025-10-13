@@ -1,8 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include "driver/ledc.h"   // pour les types LEDC_*
-#include "esp_log.h"       // si tu veux des logs conditionnels
+#include "driver/ledc.h"   
 
 /*****************************************************
  *                 PARAMÈTRES GÉNÉRAUX
