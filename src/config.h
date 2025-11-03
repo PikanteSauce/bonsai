@@ -35,21 +35,20 @@
 #define ECHO                    47
 #define DISTANCE_MAX            50      // cm
 #define VITESSE_SON             340.0   // m/s
+#define TPS_DISTANCE_S          10      // secondes
 
 /*****************************************************
  *                 CAPTEUR D’HUMIDITÉ
  *****************************************************/
 #define SENSOR_ANALOG_PIN       5
 #define SENSOR_ANALOG_CHANNEL   ADC_CHANNEL_4
-#define TPS_HUMIDITE            5
+#define TPS_HUMIDITE_S          5       // secondes
 
 /*****************************************************
  *                 TEMPS / DELAIS
  *****************************************************/
 #define DELAI_LED_ROUGE_MS      100
 #define DELAI_LED_VERTE_MS      50
-#define DELAI_MESURE_HUMIDITE_MS 50
-#define DELAI_MESURE_DISTANCE_MS 50
 
 #endif
 

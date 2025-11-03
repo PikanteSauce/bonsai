@@ -1,9 +1,7 @@
-//      Librairies
+//      Librairies standard
 #include <stdio.h>
 #include <stdlib.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/timers.h"
+//      Librairies ESP-IDF
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
@@ -12,6 +10,11 @@
 #include "esp_adc/adc_oneshot.h"
 #include "hal/adc_types.h"
 #include "esp_timer.h"
+
+//      Librairies FreeRTOS
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/timers.h"
 
 // Personnal libs
 #include "utils.h"
@@ -24,11 +27,11 @@ TaskHandle_t ledTaskHandleBlue = NULL;
 TaskHandle_t rangingSensorTaskHandle = NULL;
 TaskHandle_t capteurHumiditeTaskHandle = NULL;
 
-//      Manageurs de timers FreeRTOS 
-
+//      Nom
+static const char* TAG = "example";
 //      Callbacks
 static void humidite_callback(TimerHandle_t xTimer);
-static const char* TAG = "example";
+static void distance_callback(TimerHandle_t xTimer);
 
  
 //      Fonctions prototypes
@@ -46,23 +49,38 @@ void app_main(){
     xTaskCreatePinnedToCore(ledTaskRed, "led_red", 4096, NULL, 10, &ledTaskHandleRed, 1);
     xTaskCreatePinnedToCore(ledTaskGreen,"led_green", 4096, NULL, 9, &ledTaskHandleGreen, 1);
     // xTaskCreatePinnedToCore(ledTaskBlue,"led_blue", 4096, NULL, 8, &ledTaskHandleBlue, 1);
-    xTaskCreatePinnedToCore(capteurDistance,"capteurDistance", 4096, NULL, 7, &rangingSensorTaskHandle, 1);
-    xTaskCreatePinnedToCore(capteurHumidite, "capteurHumidite", 4096, NULL, 8, &capteurHumiditeTaskHandle, 1);
+    xTaskCreate(capteurDistance,"capteurDistance", 4096, NULL, 7, &rangingSensorTaskHandle);
+    xTaskCreate(capteurHumidite, "capteurHumidite", 4096, NULL, 8, &capteurHumiditeTaskHandle);
 
     /* GESTION DU TIMER */
     TimerHandle_t HumiditeTimer = xTimerCreate(
-        "humiditeTimer",                 // Nom
-        pdMS_TO_TICKS(5000),            // Période (ms)
-        pdTRUE,                         // Périodique
-        (void*)0,                       // ID (optionnel)
-        humidite_callback           // Callback
+        "humiditeTimer",                            // Nom
+        pdMS_TO_TICKS(TPS_HUMIDITE_S * 1000),       // Période (ms)
+        pdTRUE,                                     // Périodique
+        (void*)0,                                   // ID (optionnel)
+        humidite_callback                           // Callback
     );
     if (HumiditeTimer == NULL) {
         ESP_LOGE(TAG, "Erreur de création du timer capteur humidite !");
         return;
     }
-     // Démarrage du timer
+    TimerHandle_t DistanceTimer = xTimerCreate(
+        "DistanceTimer",                            // Nom
+        pdMS_TO_TICKS(TPS_DISTANCE_S * 1000),        // Période (ms)
+        pdTRUE,                                     // Périodique
+        (void*)1,                                   // ID (optionnel)
+        distance_callback                           // Callback
+    );
+
+    if (DistanceTimer == NULL) {
+        ESP_LOGE(TAG, "Erreur de création du timer capteur de distance !");
+        return;
+    }
+     // Démarrage des timers
     if (xTimerStart(HumiditeTimer, 0) != pdPASS) {
+        ESP_LOGE(TAG, "Erreur au démarrage du timer !");
+    }   
+    if (xTimerStart(DistanceTimer, 0) != pdPASS) {
         ESP_LOGE(TAG, "Erreur au démarrage du timer !");
     }   
 }
@@ -90,7 +108,7 @@ void ledTaskGreen(void *arg){
 //      Initialisation des PINS
 void setup(){
     // RED_LED
-    gpio_reset_pin(LED_RED);                          // Reset de la conf de la PIN par sécurité
+    gpio_reset_pin(LED_RED);                    // Reset de la conf de la PIN par sécurité
     gpio_set_direction(LED_RED, GPIO_MODE_OUTPUT); 
     // GREEN_LED
     gpio_reset_pin(LED_GREEN);                        // Reset de la conf de la PIN par sécurité
@@ -110,7 +128,8 @@ void setup(){
 
 void capteurDistance(void *arg){
     static const char *TAG = "ULTRASON";
-    while (1) {
+    for(;;) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         float mesuresBrutes [TAILLE_TAB] = {};
         // float mesuresTriees [20] = {};
         for(int indexMesure = 0; indexMesure < (TAILLE_TAB) - 1; indexMesure ++) {
@@ -160,31 +179,33 @@ void capteurDistance(void *arg){
         else {
             ESP_LOGI(TAG, "Distance = %.2f cm", mesureFiltree);
         }
+        // vTaskDelete(NULL); // supprime la tâche   
     }
-    vTaskDelete(NULL); // supprime la tâche   
+
 }   
 
 
 void capteurHumidite(void *arg){
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    int humidite = 0;
-    static const char *TAG = "HUMIDITE";
-    
-    /*                        CREATION DE L'ADC                           */
-    adc_oneshot_unit_handle_t adc1_handle;
-    adc_oneshot_unit_init_cfg_t init_config1 = {
-        .unit_id = ADC_UNIT_1,
-        .ulp_mode = ADC_ULP_MODE_DISABLE,
-    };
-    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
-    adc_oneshot_chan_cfg_t chan_config = {
-        .atten = ADC_ATTEN_DB_12,
-        .bitwidth = ADC_BITWIDTH_12, 
+    for(;;) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        int humidite = 0;
+        static const char *TAG = "HUMIDITE";
+        
+        /*                        CREATION DE L'ADC                           */
+        adc_oneshot_unit_handle_t adc1_handle;
+        adc_oneshot_unit_init_cfg_t init_config1 = {
+            .unit_id = ADC_UNIT_1,
+            .ulp_mode = ADC_ULP_MODE_DISABLE,
         };
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, SENSOR_ANALOG_CHANNEL, &chan_config));
+        ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
+        adc_oneshot_chan_cfg_t chan_config = {
+            .atten = ADC_ATTEN_DB_12,
+            .bitwidth = ADC_BITWIDTH_12, 
+            };
+        ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, SENSOR_ANALOG_CHANNEL, &chan_config));
 
-    /*          LECTURE DONNEES BRUTES ET CONVERSION EN VOLTS ET POURCENTAGE             */
-    while(1) {
+        /*          LECTURE DONNEES BRUTES ET CONVERSION EN VOLTS ET POURCENTAGE             */
+        // while(1) {
         float mesuresBrutes [TAILLE_TAB] = {};
         for (int i = 0; i < (TAILLE_TAB - 1); i++)
         {
@@ -197,16 +218,20 @@ void capteurHumidite(void *arg){
         // filtrage de la valeur
         float mesureFiltree = filtreMedianeMoy(mesuresBrutes, 2.0);
         ESP_LOGI(TAG, "Humidite = %.2f %%", mesureFiltree);
+        // }
+        adc_oneshot_del_unit(adc1_handle);      // supprime le handler pour l'ADC, libère la ressource
+        // vTaskDelete(NULL);                      // supprime la tâche
     }
-    adc_oneshot_del_unit(adc1_handle);      // supprime le handler pour l'ADC, libère la ressource
-    vTaskDelete(NULL);                      // supprime la tâche
 }
 
-static void humidite_callback(TimerHandle_t xTimer)
-{
-    int64_t time_since_boot = esp_timer_get_time();
-    ESP_LOGI(TAG, "Periodic timer called, time since boot: %lld us", time_since_boot);
+static void humidite_callback(TimerHandle_t xTimer) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     vTaskNotifyGiveFromISR(capteurHumiditeTaskHandle, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(); // pour forcer le réveil immédiat
+}
+
+static void distance_callback(TimerHandle_t xTimer) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    vTaskNotifyGiveFromISR(rangingSensorTaskHandle, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(); // pour forcer le réveil immédiat
 }
