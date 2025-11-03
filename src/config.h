@@ -41,6 +41,7 @@
  *****************************************************/
 #define SENSOR_ANALOG_PIN       5
 #define SENSOR_ANALOG_CHANNEL   ADC_CHANNEL_4
+#define TPS_HUMIDITE            5
 
 /*****************************************************
  *                 TEMPS / DELAIS

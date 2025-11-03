@@ -11,6 +11,7 @@
 #include "esp_intr_alloc.h"
 #include "esp_adc/adc_oneshot.h"
 #include "hal/adc_types.h"
+#include "esp_timer.h"
 
 // Personnal libs
 #include "utils.h"
@@ -22,6 +23,13 @@ TaskHandle_t ledTaskHandleGreen = NULL;
 TaskHandle_t ledTaskHandleBlue = NULL;
 TaskHandle_t rangingSensorTaskHandle = NULL;
 TaskHandle_t capteurHumiditeTaskHandle = NULL;
+
+//      Manageurs de timers FreeRTOS 
+
+//      Callbacks
+static void humidite_callback(TimerHandle_t xTimer);
+static const char* TAG = "example";
+
  
 //      Fonctions prototypes
 void setup();
@@ -40,6 +48,23 @@ void app_main(){
     // xTaskCreatePinnedToCore(ledTaskBlue,"led_blue", 4096, NULL, 8, &ledTaskHandleBlue, 1);
     xTaskCreatePinnedToCore(capteurDistance,"capteurDistance", 4096, NULL, 7, &rangingSensorTaskHandle, 1);
     xTaskCreatePinnedToCore(capteurHumidite, "capteurHumidite", 4096, NULL, 8, &capteurHumiditeTaskHandle, 1);
+
+    /* GESTION DU TIMER */
+    TimerHandle_t HumiditeTimer = xTimerCreate(
+        "humiditeTimer",                 // Nom
+        pdMS_TO_TICKS(5000),            // Période (ms)
+        pdTRUE,                         // Périodique
+        (void*)0,                       // ID (optionnel)
+        humidite_callback           // Callback
+    );
+    if (HumiditeTimer == NULL) {
+        ESP_LOGE(TAG, "Erreur de création du timer capteur humidite !");
+        return;
+    }
+     // Démarrage du timer
+    if (xTimerStart(HumiditeTimer, 0) != pdPASS) {
+        ESP_LOGE(TAG, "Erreur au démarrage du timer !");
+    }   
 }
 
 //      Tâche led rouge
@@ -60,6 +85,27 @@ void ledTaskGreen(void *arg){
         gpio_set_level(LED_GREEN, 1);
         vTaskDelay(50);
     }
+}
+
+//      Initialisation des PINS
+void setup(){
+    // RED_LED
+    gpio_reset_pin(LED_RED);                          // Reset de la conf de la PIN par sécurité
+    gpio_set_direction(LED_RED, GPIO_MODE_OUTPUT); 
+    // GREEN_LED
+    gpio_reset_pin(LED_GREEN);                        // Reset de la conf de la PIN par sécurité
+    gpio_set_direction(LED_GREEN, GPIO_MODE_OUTPUT); 
+    // BLUE LED
+    gpio_reset_pin(LEDC_OUTPUT_IO);
+    // TRIG
+    gpio_reset_pin(TRIG);
+    gpio_set_direction(TRIG, GPIO_MODE_OUTPUT);
+    // ECHO
+    gpio_reset_pin(ECHO);
+    gpio_set_direction(ECHO, GPIO_MODE_INPUT);
+    //  HUMIDITE
+    gpio_reset_pin(SENSOR_ANALOG_PIN);
+    gpio_set_direction(SENSOR_ANALOG_PIN, GPIO_MODE_INPUT);       
 }
 
 void capteurDistance(void *arg){
@@ -118,28 +164,9 @@ void capteurDistance(void *arg){
     vTaskDelete(NULL); // supprime la tâche   
 }   
 
-//      Initialisation des PINS
-void setup(){
-    // RED_LED
-    gpio_reset_pin(LED_RED);                          // Reset de la conf de la PIN par sécurité
-    gpio_set_direction(LED_RED, GPIO_MODE_OUTPUT); 
-    // GREEN_LED
-    gpio_reset_pin(LED_GREEN);                        // Reset de la conf de la PIN par sécurité
-    gpio_set_direction(LED_GREEN, GPIO_MODE_OUTPUT); 
-    // BLUE LED
-    gpio_reset_pin(LEDC_OUTPUT_IO);
-    // TRIG
-    gpio_reset_pin(TRIG);
-    gpio_set_direction(TRIG, GPIO_MODE_OUTPUT);
-    // ECHO
-    gpio_reset_pin(ECHO);
-    gpio_set_direction(ECHO, GPIO_MODE_INPUT);
-    //  HUMIDITE
-    gpio_reset_pin(SENSOR_ANALOG_PIN);
-    gpio_set_direction(SENSOR_ANALOG_PIN, GPIO_MODE_INPUT);       
-}
 
 void capteurHumidite(void *arg){
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     int humidite = 0;
     static const char *TAG = "HUMIDITE";
     
@@ -173,4 +200,13 @@ void capteurHumidite(void *arg){
     }
     adc_oneshot_del_unit(adc1_handle);      // supprime le handler pour l'ADC, libère la ressource
     vTaskDelete(NULL);                      // supprime la tâche
+}
+
+static void humidite_callback(TimerHandle_t xTimer)
+{
+    int64_t time_since_boot = esp_timer_get_time();
+    ESP_LOGI(TAG, "Periodic timer called, time since boot: %lld us", time_since_boot);
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    vTaskNotifyGiveFromISR(capteurHumiditeTaskHandle, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(); // pour forcer le réveil immédiat
 }
