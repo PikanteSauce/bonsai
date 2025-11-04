@@ -23,7 +23,7 @@
 #define LEDC_OUTPUT_IO          5
 #define LEDC_CHANNEL            LEDC_CHANNEL_0
 #define LEDC_DUTY_RES           LEDC_TIMER_13_BIT
-#define LEDC_FREQUENCY          4000
+#define LEDC_FREQUENCY          1000    // a tester, pusi augmenter jusqu'à 2kHz max
 #define LEDC_DUTY               4096
 #define LEDC_TIMER              LEDC_TIMER_0
 #define LEDC_MODE               LEDC_LOW_SPEED_MODE
