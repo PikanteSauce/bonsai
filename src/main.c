@@ -227,11 +227,12 @@ void capteurHumidite(void *arg){
 static void humidite_callback(TimerHandle_t xTimer) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     vTaskNotifyGiveFromISR(capteurHumiditeTaskHandle, &xHigherPriorityTaskWoken);
-    portYIELD_FROM_ISR(); // pour forcer le réveil immédiat
+    // portYIELD_FROM_ISR(); // pour forcer le réveil immédiat /* Voir avec le numéro de priorité des tâches, notamment avec le futur serveur web */
 }
 
 static void distance_callback(TimerHandle_t xTimer) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     vTaskNotifyGiveFromISR(rangingSensorTaskHandle, &xHigherPriorityTaskWoken);
-    portYIELD_FROM_ISR(); // pour forcer le réveil immédiat
+    // portYIELD_FROM_ISR(); // pour forcer le réveil immédiat /* Voir avec le numéro de priorité des tâches, notamment avec le futur serveur web */
+}
 }
