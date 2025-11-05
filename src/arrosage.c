@@ -10,7 +10,11 @@
   4. Implémentation mode manuel 
       Activer arrosage 
       Visualisation niveau d'humidité
-    
+  5. Répartir serveur sur un core et l'autre core avec les tâches (capteurs actionneurs sur l'autres
+    => VOIR freeeRTOS AMP et SMP
+    FreeRTOS ports that support Symmetric Multi Processing (SMP) allow different tasks to run simultaneously on
+    multiple cores of the same CPU. For these ports, you may specify which core a task will run on by using
+    functions with "Affinity" in the name
 
 
 
