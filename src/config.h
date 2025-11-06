@@ -11,11 +11,6 @@
 #define MAX_RESOLUTION          4095
 #define HUMIDITE_TOLERANCE_CM   2.0
 
-/*****************************************************
- *                 LEDS
- *****************************************************/
-#define LED_RED                 41
-#define LED_GREEN               17
 
 /*****************************************************
  *                 POMPE / PWM
@@ -44,11 +39,6 @@
 #define SENSOR_ANALOG_CHANNEL   ADC_CHANNEL_4
 #define TPS_HUMIDITE_S          5       // secondes
 
-/*****************************************************
- *                 TEMPS / DELAIS
- *****************************************************/
-#define DELAI_LED_ROUGE_MS      100
-#define DELAI_LED_VERTE_MS      50
 
 #endif
 

@@ -21,9 +21,6 @@
 #include "config.h"
 
 //      Manageurs de tâches
-TaskHandle_t ledTaskHandleRed = NULL;
-TaskHandle_t ledTaskHandleGreen = NULL;
-TaskHandle_t ledTaskHandleBlue = NULL;
 TaskHandle_t rangingSensorTaskHandle = NULL;
 TaskHandle_t capteurHumiditeTaskHandle = NULL;
 
@@ -36,9 +33,6 @@ static void distance_callback(TimerHandle_t xTimer);
  
 //      Fonctions prototypes
 void setup();
-void ledTaskRed(void *arg);
-void ledTaskGreen(void *arg);
-// void ledTaskBlue(void *arg);                vTaskDelay(pdMS_TO_TICKS(1000));
 void capteurHumidite(void *arg);
 void capteurDistance(void *arg);
 
@@ -46,9 +40,6 @@ void capteurDistance(void *arg);
 //      Programme main
 void app_main(){
     setup();
-    xTaskCreatePinnedToCore(ledTaskRed, "led_red", 4096, NULL, 10, &ledTaskHandleRed, 1);
-    xTaskCreatePinnedToCore(ledTaskGreen,"led_green", 4096, NULL, 9, &ledTaskHandleGreen, 1);
-    // xTaskCreatePinnedToCore(ledTaskBlue,"led_blue", 4096, NULL, 8, &ledTaskHandleBlue, 1);
     xTaskCreate(capteurDistance,"capteurDistance", 4096, NULL, 7, &rangingSensorTaskHandle);
     xTaskCreate(capteurHumidite, "capteurHumidite", 4096, NULL, 8, &capteurHumiditeTaskHandle);
 
@@ -85,36 +76,9 @@ void app_main(){
     }   
 }
 
-//      Tâche led rouge
-void ledTaskRed(void *arg){
-    while (1) {
-        gpio_set_level(LED_RED, 0);
-        vTaskDelay(100);
-        gpio_set_level(LED_RED, 1);
-        vTaskDelay(100);
-    }   
-}
-
-//      Tâche led verte
-void ledTaskGreen(void *arg){
-    while (1) {
-        gpio_set_level(LED_GREEN, 0);
-        vTaskDelay(50);
-        gpio_set_level(LED_GREEN, 1);
-        vTaskDelay(50);
-    }
-}
 
 //      Initialisation des PINS
 void setup(){
-    // RED_LED
-    gpio_reset_pin(LED_RED);                    // Reset de la conf de la PIN par sécurité
-    gpio_set_direction(LED_RED, GPIO_MODE_OUTPUT); 
-    // GREEN_LED
-    gpio_reset_pin(LED_GREEN);                        // Reset de la conf de la PIN par sécurité
-    gpio_set_direction(LED_GREEN, GPIO_MODE_OUTPUT); 
-    // BLUE LED
-    gpio_reset_pin(LEDC_OUTPUT_IO);
     // TRIG
     gpio_reset_pin(TRIG);
     gpio_set_direction(TRIG, GPIO_MODE_OUTPUT);
