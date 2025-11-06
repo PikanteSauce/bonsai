@@ -15,14 +15,17 @@
 /*****************************************************
  *                 POMPE / PWM
  *****************************************************/
-#define LEDC_OUTPUT_IO          5
-#define LEDC_CHANNEL            LEDC_CHANNEL_0
-#define LEDC_DUTY_RES           LEDC_TIMER_13_BIT
-#define LEDC_FREQUENCY          1000    // a tester, pusi augmenter jusqu'à 2kHz max
-#define LEDC_DUTY               4096
-#define LEDC_TIMER              LEDC_TIMER_0
-#define LEDC_MODE               LEDC_LOW_SPEED_MODE
-
+#define PUMP_PIN                6
+#define PUMP_CHANNEL            LEDC_CHANNEL_0
+#define PUMP_DUTY_RES           LEDC_TIMER_13_BIT
+#define PUMP_FREQUENCY          1000    // a tester pour 1kHz, puis augmenter jusqu'à 2kHz max
+#define PUMP_DUTY               4096
+#define PUMP_TIMER              LEDC_TIMER_0
+#define PUMP_MODE               LEDC_LOW_SPEED_MODE
+typedef enum {
+    CMD_ARRETER = 0,                    // 0 = stop
+    CMD_DEMARRER = 1,                   // 1 = on
+} pompe_cmd_t;
 /*****************************************************
  *                 CAPTEUR ULTRASON
  *****************************************************/
@@ -39,6 +42,12 @@
 #define SENSOR_ANALOG_CHANNEL   ADC_CHANNEL_4
 #define TPS_HUMIDITE_S          5       // secondes
 
-
+/*****************************************************
+ *                 PLANTES
+ *****************************************************/
+typedef struct {
+    int8_t tresSec ;
+} TauxHumidite;
+               
 #endif
 

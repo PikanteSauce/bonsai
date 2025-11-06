@@ -23,6 +23,7 @@
 //      Manageurs de tâches
 TaskHandle_t rangingSensorTaskHandle = NULL;
 TaskHandle_t capteurHumiditeTaskHandle = NULL;
+TaskHandle_t moteurArrosageTaskHandle = NULL;
 
 //      Nom
 static const char* TAG = "example";
@@ -35,6 +36,7 @@ static void distance_callback(TimerHandle_t xTimer);
 void setup();
 void capteurHumidite(void *arg);
 void capteurDistance(void *arg);
+void pompeArrosage(void* arg);
 
 // TODO : supprimer les boucle while(1) et remplacer par des timers et callbacks
 //      Programme main
@@ -42,6 +44,8 @@ void app_main(){
     setup();
     xTaskCreate(capteurDistance,"capteurDistance", 4096, NULL, 7, &rangingSensorTaskHandle);
     xTaskCreate(capteurHumidite, "capteurHumidite", 4096, NULL, 8, &capteurHumiditeTaskHandle);
+    xTaskCreate(pompeArrosage, "pompeArrosage", 4096, NULL, 9, &moteurArrosageTaskHandle);
+
 
     /* GESTION DU TIMER */
     TimerHandle_t HumiditeTimer = xTimerCreate(
@@ -57,14 +61,14 @@ void app_main(){
     }
     TimerHandle_t DistanceTimer = xTimerCreate(
         "DistanceTimer",                            // Nom
-        pdMS_TO_TICKS(TPS_DISTANCE_S * 1000),        // Période (ms)
+        pdMS_TO_TICKS(TPS_DISTANCE_S * 1000),       // Période (ms)
         pdTRUE,                                     // Périodique
         (void*)1,                                   // ID (optionnel)
         distance_callback                           // Callback
     );
 
     if (DistanceTimer == NULL) {
-        ESP_LOGE(TAG, "Erreur de création du timer capteur de distance !");
+    ESP_LOGE(TAG, "Erreur de création du timer capteur de distance !");
         return;
     }
      // Démarrage des timers
@@ -87,7 +91,9 @@ void setup(){
     gpio_set_direction(ECHO, GPIO_MODE_INPUT);
     //  HUMIDITE
     gpio_reset_pin(SENSOR_ANALOG_PIN);
-    gpio_set_direction(SENSOR_ANALOG_PIN, GPIO_MODE_INPUT);       
+    gpio_set_direction(SENSOR_ANALOG_PIN, GPIO_MODE_INPUT);
+    //  MOTEUR
+    gpio_reset_pin(PUMP_PIN);
 }
 
 void capteurDistance(void *arg){
@@ -182,9 +188,58 @@ void capteurHumidite(void *arg){
         // filtrage de la valeur
         float mesureFiltree = filtreMedianeMoy(mesuresBrutes, 2.0);
         ESP_LOGI(TAG, "Humidite = %.2f %%", mesureFiltree);
+        if (mesureFiltree < 60.0) {
+           xTaskNotifyGiveIndexed(moteurArrosageTaskHandle, 0 ); 
+        }
         // }
         adc_oneshot_del_unit(adc1_handle);      // supprime le handler pour l'ADC, libère la ressource
-        // vTaskDelete(NULL);                      // supprime la tâche
+        // vTaskDelete(NULL);                   // supprime la tâche
+    }
+}
+
+void pompeArrosage(void* arg) {
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode       = PUMP_MODE,
+        .duty_resolution  = PUMP_DUTY_RES,
+        .timer_num        = PUMP_TIMER,
+        .freq_hz          = PUMP_FREQUENCY,
+        .clk_cfg          = LEDC_AUTO_CLK 
+    };
+    ledc_timer_config(&ledc_timer);
+
+    ledc_channel_config_t ledc_channel = {
+        .speed_mode     = PUMP_MODE,
+        .channel        = PUMP_CHANNEL,
+        .timer_sel      = PUMP_TIMER,
+        .intr_type      = LEDC_INTR_DISABLE,
+        .gpio_num       = PUMP_PIN,
+        .duty           = 0,
+        .hpoint         = 0
+    };
+    ledc_channel_config(&ledc_channel); 
+    // ledc_set_duty(PUMP_MODE, PUMP_CHANNEL, 2000);
+    // ledc_update_duty(PUMP_MODE, PUMP_CHANNEL);
+    ledc_stop(PUMP_MODE, PUMP_CHANNEL, 0); 
+    int32_t step = 200;
+    for(;;) {
+        // Fade in
+        ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
+        ledc_set_duty(PUMP_MODE, PUMP_CHANNEL, 8000);
+        ledc_update_duty(PUMP_MODE, PUMP_CHANNEL);
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+        ledc_stop(PUMP_MODE, PUMP_CHANNEL, 0);
+
+        // for (int duty = 0; duty <= (1 << PUMP_DUTY_RES); duty += step) {
+        //     ledc_set_duty(PUMP_MODE, PUMP_CHANNEL, duty);
+        //     ledc_update_duty(PUMP_MODE, PUMP_CHANNEL);
+        //     vTaskDelay(50 / portTICK_PERIOD_MS);
+        // }
+        // // Fade out
+        // for (int duty = (1 << PUMP_DUTY_RES); duty >= 0; duty -= step) {
+        //     ledc_set_duty(PUMP_MODE, PUMP_CHANNEL, duty);
+        //     ledc_update_duty(PUMP_MODE, PUMP_CHANNEL);
+        //     vTaskDelay(50 / portTICK_PERIOD_MS);
+        // }
     }
 }
 
@@ -198,5 +253,4 @@ static void distance_callback(TimerHandle_t xTimer) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     vTaskNotifyGiveFromISR(rangingSensorTaskHandle, &xHigherPriorityTaskWoken);
     // portYIELD_FROM_ISR(); // pour forcer le réveil immédiat /* Voir avec le numéro de priorité des tâches, notamment avec le futur serveur web */
-}
 }
