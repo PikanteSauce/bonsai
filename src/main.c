@@ -10,11 +10,14 @@
 #include "esp_adc/adc_oneshot.h"
 #include "hal/adc_types.h"
 #include "esp_timer.h"
+#include "esp_http_server.h"
+#include "esp_wifi.h"
 
 //      Librairies FreeRTOS
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
+#include "freertos/queue.h"
 
 // Personnal libs
 #include "utils.h"
@@ -24,6 +27,7 @@
 TaskHandle_t rangingSensorTaskHandle = NULL;
 TaskHandle_t capteurHumiditeTaskHandle = NULL;
 TaskHandle_t moteurArrosageTaskHandle = NULL;
+TaskHandle_t testHandler = NULL;
 
 //      Nom
 static const char* TAG = "example";
@@ -37,16 +41,15 @@ void setup();
 void capteurHumidite(void *arg);
 void capteurDistance(void *arg);
 void pompeArrosage(void* arg);
+void test(void* arg);
 
-// TODO : supprimer les boucle while(1) et remplacer par des timers et callbacks
 //      Programme main
 void app_main(){
     setup();
-    xTaskCreate(capteurDistance,"capteurDistance", 4096, NULL, 7, &rangingSensorTaskHandle);
-    xTaskCreate(capteurHumidite, "capteurHumidite", 4096, NULL, 8, &capteurHumiditeTaskHandle);
-    xTaskCreate(pompeArrosage, "pompeArrosage", 4096, NULL, 9, &moteurArrosageTaskHandle);
-
-
+    xTaskCreatePinnedToCore(capteurDistance,"capteurDistance", 4096, NULL, 9, &rangingSensorTaskHandle, 1);
+    xTaskCreatePinnedToCore(capteurHumidite, "capteurHumidite", 4096, NULL, 9, &capteurHumiditeTaskHandle, 1);
+    xTaskCreatePinnedToCore(pompeArrosage, "pompeArrosage", 4096, NULL, 6, &moteurArrosageTaskHandle, 1);
+    xTaskCreatePinnedToCore(test, "fonction_test", 4096, NULL, 8, &testHandler, 1);
     /* GESTION DU TIMER */
     TimerHandle_t HumiditeTimer = xTimerCreate(
         "humiditeTimer",                            // Nom
@@ -80,7 +83,6 @@ void app_main(){
     }   
 }
 
-
 //      Initialisation des PINS
 void setup(){
     // TRIG
@@ -94,6 +96,13 @@ void setup(){
     gpio_set_direction(SENSOR_ANALOG_PIN, GPIO_MODE_INPUT);
     //  MOTEUR
     gpio_reset_pin(PUMP_PIN);
+}
+
+void test(void* arg) {
+    for(;;) {
+        ESP_LOGI(TAG, "Je suis la tâche test");
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }    
 }
 
 void capteurDistance(void *arg){
@@ -188,7 +197,7 @@ void capteurHumidite(void *arg){
         // filtrage de la valeur
         float mesureFiltree = filtreMedianeMoy(mesuresBrutes, 2.0);
         ESP_LOGI(TAG, "Humidite = %.2f %%", mesureFiltree);
-        if (mesureFiltree < 60.0) {
+        if (mesureFiltree < 90.0) {
            xTaskNotifyGiveIndexed(moteurArrosageTaskHandle, 0 ); 
         }
         // }
@@ -217,10 +226,7 @@ void pompeArrosage(void* arg) {
         .hpoint         = 0
     };
     ledc_channel_config(&ledc_channel); 
-    // ledc_set_duty(PUMP_MODE, PUMP_CHANNEL, 2000);
-    // ledc_update_duty(PUMP_MODE, PUMP_CHANNEL);
     ledc_stop(PUMP_MODE, PUMP_CHANNEL, 0); 
-    int32_t step = 200;
     for(;;) {
         // Fade in
         ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
@@ -228,18 +234,6 @@ void pompeArrosage(void* arg) {
         ledc_update_duty(PUMP_MODE, PUMP_CHANNEL);
         vTaskDelay(3000 / portTICK_PERIOD_MS);
         ledc_stop(PUMP_MODE, PUMP_CHANNEL, 0);
-
-        // for (int duty = 0; duty <= (1 << PUMP_DUTY_RES); duty += step) {
-        //     ledc_set_duty(PUMP_MODE, PUMP_CHANNEL, duty);
-        //     ledc_update_duty(PUMP_MODE, PUMP_CHANNEL);
-        //     vTaskDelay(50 / portTICK_PERIOD_MS);
-        // }
-        // // Fade out
-        // for (int duty = (1 << PUMP_DUTY_RES); duty >= 0; duty -= step) {
-        //     ledc_set_duty(PUMP_MODE, PUMP_CHANNEL, duty);
-        //     ledc_update_duty(PUMP_MODE, PUMP_CHANNEL);
-        //     vTaskDelay(50 / portTICK_PERIOD_MS);
-        // }
     }
 }
 
